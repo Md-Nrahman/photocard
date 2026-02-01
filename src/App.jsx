@@ -1,7 +1,15 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Rnd } from "react-rnd";
 import { toPng } from "html-to-image";
-import { Download, Upload, XCircle, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  Download,
+  Upload,
+  XCircle,
+  ArrowUp,
+  ArrowDown,
+  Menu,
+  X,
+} from "lucide-react";
 
 const App = () => {
   const getBengaliDate = () => {
@@ -16,10 +24,30 @@ const App = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [title, setTitle] = useState(getBengaliDate());
   const [details, setDetails] = useState("এখানে লিখুন");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [scale, setScale] = useState(1);
+
   const cardRef = useRef(null);
+  const workspaceRef = useRef(null);
 
   const CARD_WIDTH = 1280;
   const CARD_HEIGHT = 1600;
+
+  // Handle Scaling for Mobile Responsiveness
+  useEffect(() => {
+    const updateScale = () => {
+      if (workspaceRef.current) {
+        const padding = window.innerWidth < 768 ? 20 : 80;
+        const availableWidth = workspaceRef.current.offsetWidth - padding;
+        const newScale = Math.min(availableWidth / CARD_WIDTH, 1);
+        setScale(newScale);
+      }
+    };
+
+    updateScale();
+    window.addEventListener("resize", updateScale);
+    return () => window.removeEventListener("resize", updateScale);
+  }, []);
 
   const handleUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -64,7 +92,7 @@ const App = () => {
         cacheBust: true,
       });
       const link = document.createElement("a");
-      link.download = "photocard.png";
+      link.download = `photocard-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
     }
@@ -73,8 +101,28 @@ const App = () => {
 
   return (
     <div style={styles.container}>
+      {/* MOBILE HEADER */}
+      <div style={styles.mobileHeader}>
+        <h2 style={{ fontSize: "1rem", margin: 0 }}>Studio Editor</h2>
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          style={styles.menuBtn}
+        >
+          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+
       {/* --- SIDEBAR --- */}
-      <div style={styles.sidebar}>
+      <div
+        style={{
+          ...styles.sidebar,
+          transform:
+            sidebarOpen || window.innerWidth > 1024
+              ? "translateX(0)"
+              : "translateX(-100%)",
+          position: window.innerWidth <= 1024 ? "fixed" : "relative",
+        }}
+      >
         <h2 style={styles.heading}>Studio Editor</h2>
 
         <label style={styles.uploadBtn}>
@@ -95,8 +143,8 @@ const App = () => {
         <div style={styles.section}>
           <label style={styles.label}>Title</label>
           <textarea
-            placeholder="Type here... Use Enter for new lines"
-            style={{ ...styles.input, height: "120px", resize: "vertical" }}
+            placeholder="Type here..."
+            style={{ ...styles.input, height: "100px", resize: "none" }}
             value={details}
             onChange={(e) => setDetails(e.target.value)}
           />
@@ -122,63 +170,92 @@ const App = () => {
       </div>
 
       {/* --- WORKSPACE --- */}
-      <div style={styles.workspace} onClick={() => setSelectedId(null)}>
+      <div
+        ref={workspaceRef}
+        style={styles.workspace}
+        onClick={() => {
+          setSelectedId(null);
+          if (window.innerWidth <= 1024) setSidebarOpen(false);
+        }}
+      >
+        {/* SCALE WRAPPER */}
         <div
-          ref={cardRef}
-          onClick={(e) => e.stopPropagation()}
-          style={{ ...styles.card, width: CARD_WIDTH, height: CARD_HEIGHT }}
+          style={{
+            width: CARD_WIDTH * scale,
+            height: CARD_HEIGHT * scale,
+            transition: "transform 0.2s ease-out",
+            position: "relative",
+          }}
         >
-          {/* IMAGE LAYERS */}
-          {images.map((img, index) => (
-            <Rnd
-              key={img.id}
-              default={{
-                x: img.x,
-                y: img.y,
-                width: img.width,
-                height: img.height,
-              }}
-              bounds="parent"
-              onMouseDown={() => setSelectedId(img.id)}
-              style={{
-                zIndex: index + 1,
-                border: selectedId === img.id ? "4px solid #3b82f6" : "none",
-              }}
-            >
-              <div
-                style={{ position: "relative", width: "100%", height: "100%" }}
+          <div
+            ref={cardRef}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              ...styles.card,
+              width: CARD_WIDTH,
+              height: CARD_HEIGHT,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+            }}
+          >
+            {/* IMAGE LAYERS */}
+            {images.map((img, index) => (
+              <Rnd
+                key={img.id}
+                default={{
+                  x: img.x,
+                  y: img.y,
+                  width: img.width,
+                  height: img.height,
+                }}
+                bounds="parent"
+                onMouseDown={() => setSelectedId(img.id)}
+                style={{
+                  zIndex: index + 1,
+                  border: selectedId === img.id ? "4px solid #3b82f6" : "none",
+                }}
               >
-                {selectedId === img.id && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeImage(img.id);
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    height: "100%",
+                  }}
+                >
+                  {selectedId === img.id && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeImage(img.id);
+                      }}
+                      style={styles.deleteBtn}
+                    >
+                      <XCircle size={32} fill="#ef4444" color="white" />
+                    </button>
+                  )}
+                  <img
+                    src={img.url}
+                    draggable={false}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
                     }}
-                    style={styles.deleteBtn}
-                  >
-                    <XCircle size={32} fill="#ef4444" color="white" />
-                  </button>
-                )}
-                <img
-                  src={img.url}
-                  draggable={false}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </div>
-            </Rnd>
-          ))}
+                  />
+                </div>
+              </Rnd>
+            ))}
 
-          {/* FRAME LAYER */}
-          <img src="./photocard.png" style={styles.frame} alt="Frame" />
+            <img src="./photocard.png" style={styles.frame} alt="Frame" />
 
-          {/* TEXT OVERLAY */}
-          <div style={styles.textOverlay}>
-            <h1 className="custom-title" style={styles.titleText}>
-              {title}
-            </h1>
-            <p className="custom-details" style={styles.subText}>
-              {details}
-            </p>
+            <div style={styles.textOverlay}>
+              <h1 className="custom-title" style={styles.titleText}>
+                {title}
+              </h1>
+              <p className="custom-details" style={styles.subText}>
+                {details}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -189,31 +266,54 @@ const App = () => {
 const styles = {
   container: {
     display: "flex",
+    flexDirection: window.innerWidth <= 1024 ? "column" : "row",
     height: "100vh",
     background: "#09090b",
     color: "white",
     fontFamily: "sans-serif",
+    overflow: "hidden",
+  },
+  mobileHeader: {
+    display: window.innerWidth <= 1024 ? "flex" : "none",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0 20px",
+    height: "60px",
+    background: "#121214",
+    borderBottom: "1px solid #27272a",
+    zIndex: 1100,
+  },
+  menuBtn: {
+    background: "none",
+    border: "none",
+    color: "white",
+    cursor: "pointer",
   },
   sidebar: {
-    width: "320px",
+    width: window.innerWidth <= 1024 ? "280px" : "320px",
+    height: "100%",
     padding: "30px",
     background: "#121214",
     borderRight: "1px solid #27272a",
     zIndex: 1000,
+    transition: "transform 0.3s ease",
+    display: "flex",
+    flexDirection: "column",
+    top: 0,
+    left: 0,
   },
-  heading: { fontSize: "1.2rem", marginBottom: "30px" },
+  heading: {
+    fontSize: "1.2rem",
+    marginBottom: "30px",
+    display: window.innerWidth <= 1024 ? "none" : "block",
+  },
   section: {
     marginTop: "20px",
     display: "flex",
     flexDirection: "column",
     gap: "8px",
   },
-  label: {
-    fontSize: "11px",
-    color: "#71717a",
-    textTransform: "uppercase",
-    letterSpacing: "1px",
-  },
+  label: { fontSize: "11px", color: "#71717a", textTransform: "uppercase" },
   input: {
     background: "#1c1c1f",
     border: "1px solid #3f3f46",
@@ -268,11 +368,12 @@ const styles = {
     overflow: "auto",
     display: "flex",
     justifyContent: "center",
-    padding: "80px",
+    alignItems: "center",
     background: "#000",
+    padding: "20px",
   },
   card: {
-    position: "relative",
+    position: "absolute",
     background: "#111",
     overflow: "hidden",
     flexShrink: 0,
@@ -309,8 +410,8 @@ const styles = {
     position: "absolute",
     bottom: "300px",
     left: "50%",
-    transform: "translateX(-50%)", // The "magic" trick for perfect centering
-    width: "80%", // Ensures multi-line text has room to wrap
+    transform: "translateX(-50%)",
+    width: "80%",
     fontSize: "60px",
     color: "white",
     textAlign: "center",
