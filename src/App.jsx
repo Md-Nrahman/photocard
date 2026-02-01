@@ -169,11 +169,7 @@ const App = () => {
           ))}
 
           {/* FRAME LAYER */}
-          <img
-            src="/src/assets/photocard.png"
-            style={styles.frame}
-            alt="Frame"
-          />
+          <img src="./photocard.png" style={styles.frame} alt="Frame" />
 
           {/* TEXT OVERLAY */}
           <div style={styles.textOverlay}>
