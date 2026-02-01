@@ -29,21 +29,21 @@ const App = () => {
 
   const cardRef = useRef(null);
   const workspaceRef = useRef(null);
-
   const CARD_WIDTH = 1280;
   const CARD_HEIGHT = 1600;
 
-  // Handle Scaling for Mobile Responsiveness
   useEffect(() => {
     const updateScale = () => {
       if (workspaceRef.current) {
-        const padding = window.innerWidth < 768 ? 20 : 80;
-        const availableWidth = workspaceRef.current.offsetWidth - padding;
-        const newScale = Math.min(availableWidth / CARD_WIDTH, 1);
+        const isMobile = window.innerWidth <= 1024;
+        const hPadding = isMobile ? 30 : 100;
+        const vPadding = isMobile ? 100 : 100;
+        const availW = workspaceRef.current.offsetWidth - hPadding;
+        const availH = workspaceRef.current.offsetHeight - vPadding;
+        const newScale = Math.min(availW / CARD_WIDTH, availH / CARD_HEIGHT, 1);
         setScale(newScale);
       }
     };
-
     updateScale();
     window.addEventListener("resize", updateScale);
     return () => window.removeEventListener("resize", updateScale);
@@ -60,25 +60,6 @@ const App = () => {
       y: 500,
     }));
     setImages((prev) => [...prev, ...newImages]);
-  };
-
-  const moveSelectionToBack = () => {
-    if (!selectedId) return;
-    const activeImage = images.find((img) => img.id === selectedId);
-    const others = images.filter((img) => img.id !== selectedId);
-    setImages([activeImage, ...others]);
-  };
-
-  const moveSelectionToFront = () => {
-    if (!selectedId) return;
-    const activeImage = images.find((img) => img.id === selectedId);
-    const others = images.filter((img) => img.id !== selectedId);
-    setImages([...others, activeImage]);
-  };
-
-  const removeImage = (id) => {
-    setImages(images.filter((img) => img.id !== id));
-    if (selectedId === id) setSelectedId(null);
   };
 
   const saveImage = async () => {
@@ -101,7 +82,6 @@ const App = () => {
 
   return (
     <div style={styles.container}>
-      {/* MOBILE HEADER */}
       <div style={styles.mobileHeader}>
         <h2 style={{ fontSize: "1rem", margin: 0 }}>Studio Editor</h2>
         <button
@@ -112,7 +92,6 @@ const App = () => {
         </button>
       </div>
 
-      {/* --- SIDEBAR --- */}
       <div
         style={{
           ...styles.sidebar,
@@ -124,66 +103,69 @@ const App = () => {
         }}
       >
         <h2 style={styles.heading}>Studio Editor</h2>
-
         <label style={styles.uploadBtn}>
           <Upload size={18} /> Add Photo
           <input type="file" multiple hidden onChange={handleUpload} />
         </label>
-
         <div style={styles.section}>
           <label style={styles.label}>Date</label>
           <input
-            placeholder="Date"
             style={styles.input}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
         </div>
-
         <div style={styles.section}>
           <label style={styles.label}>Title</label>
           <textarea
-            placeholder="Type here..."
-            style={{ ...styles.input, height: "100px", resize: "none" }}
+            style={{ ...styles.input, height: "80px", resize: "none" }}
             value={details}
             onChange={(e) => setDetails(e.target.value)}
           />
         </div>
-
         {selectedId && (
           <div style={styles.section}>
             <label style={styles.label}>Layer Depth</label>
             <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={moveSelectionToFront} style={styles.actionBtn}>
+              <button
+                onClick={() =>
+                  setImages([
+                    ...images.filter((i) => i.id !== selectedId),
+                    images.find((i) => i.id === selectedId),
+                  ])
+                }
+                style={styles.actionBtn}
+              >
                 <ArrowUp size={16} /> Front
               </button>
-              <button onClick={moveSelectionToBack} style={styles.actionBtn}>
+              <button
+                onClick={() =>
+                  setImages([
+                    images.find((i) => i.id === selectedId),
+                    ...images.filter((i) => i.id !== selectedId),
+                  ])
+                }
+                style={styles.actionBtn}
+              >
                 <ArrowDown size={16} /> Back
               </button>
             </div>
           </div>
         )}
-
         <button onClick={saveImage} style={styles.saveBtn}>
           <Download size={18} /> Download PNG
         </button>
       </div>
 
-      {/* --- WORKSPACE --- */}
       <div
         ref={workspaceRef}
         style={styles.workspace}
-        onClick={() => {
-          setSelectedId(null);
-          if (window.innerWidth <= 1024) setSidebarOpen(false);
-        }}
+        onClick={() => setSelectedId(null)}
       >
-        {/* SCALE WRAPPER */}
         <div
           style={{
             width: CARD_WIDTH * scale,
             height: CARD_HEIGHT * scale,
-            transition: "transform 0.2s ease-out",
             position: "relative",
           }}
         >
@@ -198,7 +180,6 @@ const App = () => {
               transformOrigin: "top left",
             }}
           >
-            {/* IMAGE LAYERS */}
             {images.map((img, index) => (
               <Rnd
                 key={img.id}
@@ -226,7 +207,8 @@ const App = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        removeImage(img.id);
+                        setImages(images.filter((i) => i.id !== img.id));
+                        setSelectedId(null);
                       }}
                       style={styles.deleteBtn}
                     >
@@ -245,9 +227,7 @@ const App = () => {
                 </div>
               </Rnd>
             ))}
-
             <img src="./photocard.png" style={styles.frame} alt="Frame" />
-
             <div style={styles.textOverlay}>
               <h1 className="custom-title" style={styles.titleText}>
                 {title}
@@ -266,8 +246,8 @@ const App = () => {
 const styles = {
   container: {
     display: "flex",
-    flexDirection: window.innerWidth <= 1024 ? "column" : "row",
     height: "100vh",
+    width: "100vw",
     background: "#09090b",
     color: "white",
     fontFamily: "sans-serif",
@@ -281,7 +261,10 @@ const styles = {
     height: "60px",
     background: "#121214",
     borderBottom: "1px solid #27272a",
-    zIndex: 1100,
+    position: "fixed",
+    top: 0,
+    width: "100%",
+    zIndex: 2100,
   },
   menuBtn: {
     background: "none",
@@ -290,28 +273,23 @@ const styles = {
     cursor: "pointer",
   },
   sidebar: {
-    width: window.innerWidth <= 1024 ? "280px" : "320px",
+    width: "320px",
     height: "100%",
-    padding: "30px",
+    padding: "20px",
     background: "#121214",
     borderRight: "1px solid #27272a",
-    zIndex: 1000,
+    zIndex: 2000,
     transition: "transform 0.3s ease",
     display: "flex",
     flexDirection: "column",
-    top: 0,
-    left: 0,
+    overflowY: "auto",
   },
-  heading: {
-    fontSize: "1.2rem",
-    marginBottom: "30px",
-    display: window.innerWidth <= 1024 ? "none" : "block",
-  },
+  heading: { fontSize: "1.2rem", marginBottom: "20px" },
   section: {
-    marginTop: "20px",
+    marginTop: "15px",
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: "5px",
   },
   label: { fontSize: "11px", color: "#71717a", textTransform: "uppercase" },
   input: {
@@ -320,7 +298,6 @@ const styles = {
     padding: "12px",
     borderRadius: "6px",
     color: "white",
-    fontSize: "14px",
     outline: "none",
   },
   uploadBtn: {
@@ -357,20 +334,23 @@ const styles = {
     borderRadius: "8px",
     cursor: "pointer",
     fontWeight: "bold",
-    marginTop: "auto",
+    marginTop: "20px",
+    marginBottom: "40px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "10px",
+    flexShrink: 0,
   },
   workspace: {
     flex: 1,
-    overflow: "auto",
+    height: "100%",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     background: "#000",
     padding: "20px",
+    overflow: "hidden",
   },
   card: {
     position: "absolute",
