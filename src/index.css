@@ -1,0 +1,16 @@
+@font-face {
+  font-family: "TitleFont";
+  src: url("/src/assets/fonts/kalpurush.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "BodyFont";
+  src: url("/src/assets/fonts/ekush-regular.ttf") format("truetype");
+}
+
+.custom-title {
+  font-family: "TitleFont", sans-serif;
+}
+.custom-details {
+  font-family: "BodyFont", sans-serif;
+}
