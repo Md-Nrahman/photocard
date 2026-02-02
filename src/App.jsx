@@ -343,7 +343,11 @@ const App = () => {
               ))}
 
               {/* Static Frame (Z-index high) */}
-              <img src="./photocard.png" style={styles.frame} alt="Frame" />
+              <img
+                src={`${import.meta.env.BASE_URL}photocard.png`}
+                style={styles.frame}
+                alt="Frame"
+              />
 
               {/* Text Overlay (Z-index highest) */}
               <div style={styles.textOverlay}>
