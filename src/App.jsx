@@ -22,6 +22,7 @@ const App = () => {
 
   const cardRef = useRef(null);
   const workspaceRef = useRef(null);
+  const pinchState = useRef({});
 
   const CARD_WIDTH = 1280;
   const CARD_HEIGHT = 1600;
@@ -90,51 +91,40 @@ const App = () => {
 
   const saveImage = async () => {
     const originalSelection = selectedId;
-    setSelectedId(null); // Remove selection borders
+    setSelectedId(null);
 
-    // 1. Give React time to re-render without the borders
+    // 1. Wait for UI to update (remove selection borders)
     await new Promise((r) => setTimeout(r, 150));
 
     if (!cardRef.current) return;
 
     try {
-      // 2. Generate the PNG
+      // 2. Generate the PNG with proper snapshot settings
       const dataUrl = await toPng(cardRef.current, {
-        pixelRatio: 3, // Higher quality
-        skipFonts: false, // Ensure your Bengali fonts are captured
+        pixelRatio: 2, // 3 can sometimes crash mobile browsers due to memory
+        skipFonts: false,
         cacheBust: true,
-        // Ensure the capture size matches your internal resolution
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
         style: {
-          transform: "scale(1)", // Crucial: Reset scale for the snapshot
+          transform: "scale(1)",
           transformOrigin: "top left",
         },
       });
 
-      // 3. Create the download trigger
+      // 3. Create the anchor element
       const link = document.createElement("a");
       link.href = dataUrl;
       link.download = `photocard-${Date.now()}.png`;
 
-      // 4. Mobile vs Desktop logic
-      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(
-        navigator.userAgent
-      );
-
-      if (isMobileDevice) {
-        // On mobile, some browsers block direct downloads from blobs
-        // Open in new tab so user can "Long Press" to save
-        const newTab = window.open();
-        newTab.document.body.innerHTML = `<img src="${dataUrl}" style="width:100%;">`;
-      } else {
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
+      // 4. Force trigger the download
+      // This is the most compatible way for modern mobile Chrome/Safari
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (err) {
       console.error("Download failed:", err);
-      alert("Export failed. Please try using Chrome or Safari.");
+      alert("Export failed. Try a different browser or reduce photo size.");
     } finally {
       setSelectedId(originalSelection);
     }
@@ -334,24 +324,35 @@ const App = () => {
                       }}
                       onTouchMove={(e) => {
                         if (e.touches.length === 2) {
+                          e.preventDefault();
+
                           const dist = Math.hypot(
                             e.touches[0].clientX - e.touches[1].clientX,
                             e.touches[0].clientY - e.touches[1].clientY
                           );
 
-                          if (!img._lastDist) img._lastDist = dist;
+                          const lastDist = pinchState.current[img.id];
 
-                          const delta = (dist - img._lastDist) / 200;
-                          img._lastDist = dist;
+                          if (lastDist != null) {
+                            const delta = (dist - lastDist) / 200;
 
-                          setImages(
-                            images.map((i) =>
-                              i.id === img.id
-                                ? { ...i, zoom: Math.max(0.3, i.zoom + delta) }
-                                : i
-                            )
-                          );
+                            setImages((prev) =>
+                              prev.map((i) =>
+                                i.id === img.id
+                                  ? {
+                                      ...i,
+                                      zoom: Math.max(0.3, i.zoom + delta),
+                                    }
+                                  : i
+                              )
+                            );
+                          }
+
+                          pinchState.current[img.id] = dist;
                         }
+                      }}
+                      onTouchEnd={() => {
+                        delete pinchState.current[img.id];
                       }}
                     />
                   </div>
