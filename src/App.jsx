@@ -47,17 +47,26 @@ const App = () => {
 
   const handleUpload = (e) => {
     const files = Array.from(e.target.files);
-    const newImages = files.map((file) => ({
-      id: Math.random().toString(36).substr(2, 9),
-      url: URL.createObjectURL(file),
-      width: 600,
-      height: 600,
-      // Initial Position: Center of the Card
-      x: (CARD_WIDTH - 600) / 2,
-      y: (CARD_HEIGHT - 600) / 2.5,
-      zoom: 1,
-    }));
-    setImages((prev) => [...prev, ...newImages]);
+
+    files.forEach((file) => {
+      const reader = new FileReader();
+
+      reader.onload = (event) => {
+        const newImage = {
+          id: Math.random().toString(36).substr(2, 9),
+          url: event.target.result, // This is now a long base64 string
+          width: 600,
+          height: 600,
+          x: (CARD_WIDTH - 600) / 2,
+          y: (CARD_HEIGHT - 600) / 2.5,
+          zoom: 1,
+        };
+        setImages((prev) => [...prev, newImage]);
+      };
+
+      reader.readAsDataURL(file); // Converts image to base64
+    });
+
     if (isMobile) setSidebarOpen(false);
   };
 
@@ -81,47 +90,54 @@ const App = () => {
 
   const saveImage = async () => {
     const originalSelection = selectedId;
-    setSelectedId(null);
+    setSelectedId(null); // Remove selection borders
 
-    // Wait for border removal
-    await new Promise((r) => setTimeout(r, 80));
+    // 1. Give React time to re-render without the borders
+    await new Promise((r) => setTimeout(r, 150));
 
     if (!cardRef.current) return;
 
     try {
+      // 2. Generate the PNG
       const dataUrl = await toPng(cardRef.current, {
-        pixelRatio: 2,
+        pixelRatio: 3, // Higher quality
+        skipFonts: false, // Ensure your Bengali fonts are captured
+        cacheBust: true,
+        // Ensure the capture size matches your internal resolution
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
-        cacheBust: true,
+        style: {
+          transform: "scale(1)", // Crucial: Reset scale for the snapshot
+          transformOrigin: "top left",
+        },
       });
 
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      // 3. Create the download trigger
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `photocard-${Date.now()}.png`;
 
-      const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+      // 4. Mobile vs Desktop logic
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(
+        navigator.userAgent
+      );
 
-      if (isMobile) {
-        // 📱 Mobile-safe: open real image tab
-        window.open(url, "_blank");
+      if (isMobileDevice) {
+        // On mobile, some browsers block direct downloads from blobs
+        // Open in new tab so user can "Long Press" to save
+        const newTab = window.open();
+        newTab.document.body.innerHTML = `<img src="${dataUrl}" style="width:100%;">`;
       } else {
-        // 💻 Desktop download
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `photocard-${Date.now()}.png`;
         document.body.appendChild(link);
         link.click();
-        link.remove();
+        document.body.removeChild(link);
       }
-
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch (err) {
       console.error("Download failed:", err);
-      alert("Image export failed. Try again.");
+      alert("Export failed. Please try using Chrome or Safari.");
+    } finally {
+      setSelectedId(originalSelection);
     }
-
-    setSelectedId(originalSelection);
   };
 
   return (
@@ -343,11 +359,7 @@ const App = () => {
               ))}
 
               {/* Static Frame (Z-index high) */}
-              <img
-                src={`https://md-nrahman.github.io/photocard/photocard.png`}
-                style={styles.frame}
-                alt="Frame"
-              />
+              <img src="./photocard.png" style={styles.frame} alt="Frame" />
 
               {/* Text Overlay (Z-index highest) */}
               <div style={styles.textOverlay}>
