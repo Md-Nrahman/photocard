@@ -16,6 +16,7 @@
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-quick-pinch-zoom": "^5.1.1",
     "react-rnd": "^10.5.2"
   },
   "devDependencies": {

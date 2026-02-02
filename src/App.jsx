@@ -55,6 +55,7 @@ const App = () => {
       // Initial Position: Center of the Card
       x: (CARD_WIDTH - 600) / 2,
       y: (CARD_HEIGHT - 600) / 2.5,
+      zoom: 1,
     }));
     setImages((prev) => [...prev, ...newImages]);
     if (isMobile) setSidebarOpen(false);
@@ -80,24 +81,47 @@ const App = () => {
 
   const saveImage = async () => {
     const originalSelection = selectedId;
-    setSelectedId(null); // Remove selection border before capture
+    setSelectedId(null);
 
-    // Tiny delay to allow state update/render
-    setTimeout(async () => {
-      if (cardRef.current) {
-        const dataUrl = await toPng(cardRef.current, {
-          pixelRatio: 2,
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-          cacheBust: true,
-        });
+    // Wait for border removal
+    await new Promise((r) => setTimeout(r, 80));
+
+    if (!cardRef.current) return;
+
+    try {
+      const dataUrl = await toPng(cardRef.current, {
+        pixelRatio: 2,
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
+        cacheBust: true,
+      });
+
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+
+      const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        // 📱 Mobile-safe: open real image tab
+        window.open(url, "_blank");
+      } else {
+        // 💻 Desktop download
         const link = document.createElement("a");
+        link.href = url;
         link.download = `photocard-${Date.now()}.png`;
-        link.href = dataUrl;
+        document.body.appendChild(link);
         link.click();
+        link.remove();
       }
-      setSelectedId(originalSelection);
-    }, 50);
+
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert("Image export failed. Try again.");
+    }
+
+    setSelectedId(originalSelection);
   };
 
   return (
@@ -218,6 +242,8 @@ const App = () => {
                 <Rnd
                   key={img.id}
                   size={{ width: img.width, height: img.height }}
+                  scale={scale}
+                  enableResizing={!isMobile}
                   position={{ x: img.x, y: img.y }}
                   onDragStop={(e, d) => {
                     setImages(
@@ -274,6 +300,42 @@ const App = () => {
                         width: "100%",
                         height: "100%",
                         objectFit: "cover",
+                        transform: `scale(${img.zoom})`,
+                        touchAction: "none", // 🔑 allows pinch zoom
+                      }}
+                      onWheel={(e) => {
+                        if (!isMobile) {
+                          e.preventDefault();
+                          const delta = e.deltaY < 0 ? 0.05 : -0.05;
+                          setImages(
+                            images.map((i) =>
+                              i.id === img.id
+                                ? { ...i, zoom: Math.max(0.3, i.zoom + delta) }
+                                : i
+                            )
+                          );
+                        }
+                      }}
+                      onTouchMove={(e) => {
+                        if (e.touches.length === 2) {
+                          const dist = Math.hypot(
+                            e.touches[0].clientX - e.touches[1].clientX,
+                            e.touches[0].clientY - e.touches[1].clientY
+                          );
+
+                          if (!img._lastDist) img._lastDist = dist;
+
+                          const delta = (dist - img._lastDist) / 200;
+                          img._lastDist = dist;
+
+                          setImages(
+                            images.map((i) =>
+                              i.id === img.id
+                                ? { ...i, zoom: Math.max(0.3, i.zoom + delta) }
+                                : i
+                            )
+                          );
+                        }
                       }}
                     />
                   </div>
