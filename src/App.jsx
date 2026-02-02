@@ -344,7 +344,7 @@ const App = () => {
 
               {/* Static Frame (Z-index high) */}
               <img
-                src={`${import.meta.env.BASE_URL}photocard.png`}
+                src={`https://md-nrahman.github.io/photocard/photocard.png`}
                 style={styles.frame}
                 alt="Frame"
               />
